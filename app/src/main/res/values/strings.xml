@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Spotify wrapped group 5</string>
+    <string name="login_button">Log in</string>
+    <string name="signup_button">Sign up</string>
+    <string name="full_name">Full Name: </string>
+    <string name="username">Username: </string>
+    <string name="email">Email: </string>
+    <string name="password">Password: </string>
+    <string name="verify">Verify Password: </string>
+    <string name="submit">Submit</string>
+    <string name="artists">Your top artists:</string>
+    <string name="songrec">Based on your listening, we think you will love...</string>
+
+</resources>

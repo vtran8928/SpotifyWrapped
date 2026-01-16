@@ -1,0 +1,12 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/wrapped"
+        android:enabled="true"
+        android:icon="@drawable/music_note"
+        android:title="Wrapped"/>
+    <item
+        android:id="@+id/settings"
+        android:enabled="true"
+        android:icon="@drawable/settings"
+        android:title="Settings"/>
+</menu>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@+id/LandingPage">
+
+    <fragment
+        android:id="@+id/LandingPage"
+        android:name="com.example.spotifywrappedgroup5.LandingPage"
+        android:label="Login"
+        tools:layout="@layout/landing_page">
+        <action
+            android:id="@+id/action_LandingPage_to_SignUpPage"
+            app:destination="@id/SignUpPage"
+            app:enterAnim="@anim/nav_default_enter_anim"
+            app:exitAnim="@anim/nav_default_exit_anim" />
+        <action
+            android:id="@+id/action_LandingPage_to_SpotifySummary"
+            app:destination="@id/SpotifySummary"
+            app:enterAnim="@anim/nav_default_enter_anim"
+            app:exitAnim="@anim/nav_default_exit_anim" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/SignUpPage"
+        android:name="com.example.spotifywrappedgroup5.SignupPage"
+        android:label="Signup"
+        tools:layout="@layout/landing_page">
+        <action
+            android:id="@+id/action_SignUpPage_to_LandingPage"
+            app:destination="@id/LandingPage"
+            app:enterAnim="@anim/nav_default_enter_anim"
+            app:exitAnim="@anim/nav_default_exit_anim" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/SpotifySummary"
+        android:name="com.example.spotifywrappedgroup5.SpotifySummary"
+        android:label="Summary"
+        tools:layout="@layout/spotify_summary">
+    </fragment>
+    <action
+        android:id="@+id/action_global_SpotifySummary"
+        app:destination="@id/SpotifySummary"
+        app:enterAnim="@anim/nav_default_enter_anim"
+        app:exitAnim="@anim/nav_default_exit_anim" />
+    <fragment
+        android:id="@+id/settingsPage"
+        android:name="com.example.spotifywrappedgroup5.SettingsPage"
+        android:label="Settings"
+        tools:layout="@layout/settings_page" >
+        <action
+            android:id="@+id/action_settingsPage_to_LandingPage"
+            app:destination="@id/LandingPage"
+            app:enterAnim="@anim/nav_default_enter_anim"
+            app:exitAnim="@anim/nav_default_exit_anim" />
+    </fragment>
+    <action
+        android:id="@+id/action_global_settingsPage"
+        app:destination="@id/settingsPage"
+        app:enterAnim="@anim/nav_default_enter_anim"
+        app:exitAnim="@anim/nav_default_exit_anim" />
+
+</navigation>
