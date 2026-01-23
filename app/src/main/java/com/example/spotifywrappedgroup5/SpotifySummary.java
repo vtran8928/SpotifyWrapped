@@ -52,6 +52,8 @@ import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.RequestBody;
+import okhttp3.MediaType;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 
@@ -61,6 +63,11 @@ public class SpotifySummary extends Fragment {
 
     public static final int AUTH_TOKEN_REQUEST_CODE = 0;
     public static final int AUTH_CODE_REQUEST_CODE = 1;
+
+    // OpenAI API Configuration
+    private static final String OPENAI_API_KEY = "examplekey"; // Replace with your actual API key
+    private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String OPENAI_MODEL = "gpt-3.5-turbo";
 
     private final OkHttpClient mOkHttpClient = new OkHttpClient();
     private String mAccessToken, mAccessCode;
@@ -79,6 +86,9 @@ public class SpotifySummary extends Fragment {
     private TextView track2TextView;
     private TextView track3TextView;
 
+    // Store artist data for OpenAI integration
+    private ArrayList<String> topArtistNames = new ArrayList<>();
+    private ArrayList<String> topArtistGenres = new ArrayList<>();
 
     MediaPlayer m;
 
@@ -485,21 +495,27 @@ public class SpotifySummary extends Fragment {
             JSONArray items = topArtists.getJSONArray("items");
             ArrayList<String> artistsNames = new ArrayList<>();
             ArrayList<String> imageUrls = new ArrayList<>();
+            topArtistNames.clear(); // Clear previous data for OpenAI
+            topArtistGenres.clear();
+            
             for (int i = 0; i < items.length(); i++) {
                 JSONObject artist = items.getJSONObject(i);
                 String name = artist.getString("name");
                 artistsNames.add(name);
+                topArtistNames.add(name); // Store for OpenAI integration
+                
                 String imageUrl = artist.getJSONArray("images").getJSONObject(0).get("url").toString();
                 imageUrls.add(imageUrl);
                 JSONArray genresArray = artist.getJSONArray("genres");
                 StringBuilder genresStringBuilder = new StringBuilder();
                 for (int j = 0; j < genresArray.length(); j++) {
-                    genresStringBuilder.append(genresArray.getString(j));
+                    String genre = genresArray.getString(j);
+                    genresStringBuilder.append(genre);
                     if (j < genresArray.length() - 1) {
                         genresStringBuilder.append(", ");
                     }
-                    String genre = genresArray.getString(j);
                     genreCountMap.put(genre, genreCountMap.getOrDefault(genre, 0) + 1);
+                    topArtistGenres.add(genre); // Store for OpenAI integration
                 }
                 String genres = genresStringBuilder.toString();
                 int popularity = artist.getInt("popularity");
@@ -663,25 +679,191 @@ public class SpotifySummary extends Fragment {
         }
     }
 
+    /**
+     * Call OpenAI API to generate enhanced artist recommendations with reasoning
+     * Uses Chain-of-Thought prompting to explain why these artists are recommended
+     */
+    public void getEnhancedRecommendationsWithOpenAI() {
+        String genres = String.join(", ", genreCountMap.keySet());
+        String artists = String.join(", ", topArtistNames);
+        
+        String prompt = "Based on the following listening profile, recommend 2-3 artists similar to their taste.\n" +
+                "Use step-by-step reasoning:\n\n" +
+                "Favorite Genres: " + genres + "\n" +
+                "Top Artists: " + artists + "\n\n" +
+                "Step 1: Analyze the common themes across these genres and artists\n" +
+                "Step 2: Identify similar artists who share these characteristics\n" +
+                "Step 3: Provide 2-3 recommendations with brief explanations\n\n" +
+                "Format each as: '[Artist Name] - [Brief reason why this is a good match]'";
+
+        JSONObject requestBody = new JSONObject();
+        try {
+            requestBody.put("model", OPENAI_MODEL);
+            requestBody.put("temperature", 0.8);
+            requestBody.put("max_tokens", 200);
+            
+            JSONArray messages = new JSONArray();
+            JSONObject userMessage = new JSONObject();
+            userMessage.put("role", "user");
+            userMessage.put("content", prompt);
+            messages.put(userMessage);
+            
+            requestBody.put("messages", messages);
+        } catch (JSONException e) {
+            Log.e("OpenAI", "Error building recommendation request", e);
+            return;
+        }
+
+        RequestBody body = RequestBody.create(
+                requestBody.toString(),
+                MediaType.get("application/json; charset=utf-8")
+        );
+
+        Request request = new Request.Builder()
+                .url(OPENAI_API_URL)
+                .addHeader("Authorization", "Bearer " + OPENAI_API_KEY)
+                .post(body)
+                .build();
+
+        mOkHttpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.e("OpenAI", "Recommendation API call failed", e);
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseBody = response.body().string();
+                        JSONObject responseJson = new JSONObject(responseBody);
+                        JSONArray choices = responseJson.getJSONArray("choices");
+                        String recommendations = choices.getJSONObject(0)
+                                .getJSONObject("message")
+                                .getString("content");
+
+                        Log.d("OpenAI", "Enhanced recommendations: " + recommendations);
+                        // You can display this in a separate section or log it
+                    } catch (JSONException e) {
+                        Log.e("OpenAI", "Error parsing recommendation response", e);
+                    }
+                } else {
+                    Log.e("OpenAI", "Recommendation API error: " + response.code());
+                }
+            }
+        });
+    }
+
 
 
     // Method to display listening personality
     public void listeningPersonality() {
-        // Determine the user's listening personality based on their top genres
-        String userPersonality = determinePersonality(genreCountMap);
-
-        // Assuming there's a TextView in your layout with the id personalityTextView
-        TextView personalityTextView = getView().findViewById(R.id.personalityTextView);
-        personalityTextView.setText(userPersonality);
-
-//        lottieAnimationView.setAnimation("fireworks.json");
-//         lottieAnimationView.playAnimation();
+        // Determine the user's listening personality using OpenAI API
+        String mostCommonGenre = getMostCommonGenre(genreCountMap);
+        callOpenAIForPersonality(mostCommonGenre);
     }
 
-    private String determinePersonality(HashMap<String, Integer> genreCountMap) {
+    /**
+     * Call OpenAI API to generate personalized lifestyle insights using Chain-of-Thought prompting
+     * This uses CoT reasoning to provide more thoughtful and personalized insights
+     */
+    private void callOpenAIForPersonality(String primaryGenre) {
+        // Build the prompt with Chain-of-Thought reasoning
+        String genres = String.join(", ", genreCountMap.keySet());
+        String artists = String.join(", ", topArtistNames);
+        
+        String prompt = "Analyze this music listener's personality based on their listening habits. " +
+                "Use step-by-step reasoning (Chain-of-Thought) to explain your analysis:\n\n" +
+                "Top Genre: " + primaryGenre + "\n" +
+                "All Genres: " + genres + "\n" +
+                "Favorite Artists: " + artists + "\n\n" +
+                "Step 1: Identify the core characteristics of listeners who favor " + primaryGenre + "\n" +
+                "Step 2: Consider how the mix of genres shows musical diversity\n" +
+                "Step 3: Consider what these artists and genres say about their personality\n" +
+                "Step 4: Synthesize this into a unique personality type\n\n" +
+                "Provide a creative personality type name and a 2-3 sentence lifestyle insight. " +
+                "Format as: 'The [Name]\\n\\n[Insight]'";
 
-        String mostCommonGenre = getMostCommonGenre(genreCountMap);
+        JSONObject requestBody = new JSONObject();
+        try {
+            requestBody.put("model", OPENAI_MODEL);
+            requestBody.put("temperature", 0.7);
+            requestBody.put("max_tokens", 150);
+            
+            JSONArray messages = new JSONArray();
+            JSONObject userMessage = new JSONObject();
+            userMessage.put("role", "user");
+            userMessage.put("content", prompt);
+            messages.put(userMessage);
+            
+            requestBody.put("messages", messages);
+        } catch (JSONException e) {
+            Log.e("OpenAI", "Error building request", e);
+            useFallbackPersonality(primaryGenre);
+            return;
+        }
 
+        RequestBody body = RequestBody.create(
+                requestBody.toString(),
+                MediaType.get("application/json; charset=utf-8")
+        );
+
+        Request request = new Request.Builder()
+                .url(OPENAI_API_URL)
+                .addHeader("Authorization", "Bearer " + OPENAI_API_KEY)
+                .post(body)
+                .build();
+
+        mOkHttpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.e("OpenAI", "API call failed", e);
+                useFallbackPersonality(primaryGenre);
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseBody = response.body().string();
+                        JSONObject responseJson = new JSONObject(responseBody);
+                        JSONArray choices = responseJson.getJSONArray("choices");
+                        String personality = choices.getJSONObject(0)
+                                .getJSONObject("message")
+                                .getString("content");
+
+                        mainHandler.post(() -> {
+                            TextView personalityTextView = getView().findViewById(R.id.personalityTextView);
+                            personalityTextView.setText(personality);
+                        });
+                    } catch (JSONException e) {
+                        Log.e("OpenAI", "Error parsing response", e);
+                        useFallbackPersonality(primaryGenre);
+                    }
+                } else {
+                    Log.e("OpenAI", "API error: " + response.code());
+                    useFallbackPersonality(primaryGenre);
+                }
+            }
+        });
+    }
+
+    /**
+     * Fallback to hardcoded personality if OpenAI API fails or is not configured
+     */
+    private void useFallbackPersonality(String mostCommonGenre) {
+        String personality = determinePersonalityFallback(mostCommonGenre);
+        
+        mainHandler.post(() -> {
+            TextView personalityTextView = getView().findViewById(R.id.personalityTextView);
+            personalityTextView.setText(personality);
+        });
+    }
+
+    /**
+     * Original hardcoded personality determination (fallback)
+     */
+    private String determinePersonalityFallback(String mostCommonGenre) {
         String personality;
         switch (mostCommonGenre) {
             case "rock":
@@ -737,6 +919,11 @@ public class SpotifySummary extends Fragment {
         }
         return personality;
     }
+
+    private String determinePersonality(HashMap<String, Integer> genreCountMap) {
+        // This method is kept for backward compatibility but is now handled by listeningPersonality()
+        String mostCommonGenre = getMostCommonGenre(genreCountMap);
+        return determinePersonalityFallback(mostCommonGenre);
 
 
     private String getMostCommonGenre(HashMap<String, Integer> genreCountMap) {
